@@ -251,21 +251,25 @@ def main() -> None:
     )
     application.add_handler(conv_handler)
     
-    # For Render - add webhook mode
+    # For Render - use webhook mode
     port = int(os.environ.get("PORT", "8080"))
-    webhook_url = os.environ.get("WEBHOOK_URL")
     
-    if webhook_url:
-        # Use webhook mode
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=port,
-            webhook_url=webhook_url,
-            webhook_url_path="/"
-        )
-    else:
-        # Use polling mode
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Always use webhook mode on Render
+    webhook_url = os.environ.get("WEBHOOK_URL")
+    if not webhook_url:
+        webhook_url = os.environ.get("RENDER_EXTERNAL_URL")
+        if not webhook_url:
+            logger.error("No webhook URL found. Set WEBHOOK_URL or use Render's RENDER_EXTERNAL_URL.")
+            return
+    
+    logger.info(f"Starting webhook on port {port} with URL {webhook_url}")
+    
+    # Start webhook
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        webhook_url=webhook_url,
+    )
     
     logger.info("Bot started")
 
