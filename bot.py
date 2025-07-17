@@ -230,7 +230,8 @@ def main() -> None:
         logger.error("Telegram token not found. Set the TELEGRAM_TOKEN environment variable.")
         return
     
-    application = Application.builder().token(token).build()
+    # Build application without using default updater
+    application = Application.builder().token(token).updater(None).build()
     
     # Add command handlers
     application.add_handler(CommandHandler("start", start))
@@ -250,9 +251,23 @@ def main() -> None:
     )
     application.add_handler(conv_handler)
     
-    # Run the bot until the user presses Ctrl-C
+    # For Render - add webhook mode
+    port = int(os.environ.get("PORT", "8080"))
+    webhook_url = os.environ.get("WEBHOOK_URL")
+    
+    if webhook_url:
+        # Use webhook mode
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            webhook_url=webhook_url,
+            webhook_url_path="/"
+        )
+    else:
+        # Use polling mode
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    
     logger.info("Bot started")
-    application.run_polling()
 
 if __name__ == "__main__":
     main() 
