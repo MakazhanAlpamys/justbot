@@ -1,0 +1,17 @@
+services:
+  # A web service for our Telegram bot
+  - type: web
+    name: qamqorbot
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        # Your bot token here or set in the Render dashboard
+      - key: WEBHOOK_URL
+        # This will be automatically set by Render
+        value: ${RENDER_EXTERNAL_URL}
+      - key: PYTHON_VERSION
+        value: 3.13.4 
