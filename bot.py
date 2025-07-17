@@ -13,12 +13,19 @@ from telegram.ext import (
     CallbackQueryHandler,
     ConversationHandler,
 )
+from flask import Flask, request
 
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+# Flask app
+app = Flask(__name__)
+
+# Global application variable
+application = None
 
 # Constants for ConversationHandler
 CHOOSING, TYPING_TEXT, WAITING_MEDIA, BROADCAST = range(4)
@@ -222,16 +229,39 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
     return ConversationHandler.END
 
-def main() -> None:
-    """Start the bot."""
-    # Create the Application and pass it your bot's token
+# Flask routes for webhook
+@app.route('/', methods=['POST'])
+async def webhook():
+    """Handle webhook requests from Telegram."""
+    if request.method == "POST":
+        # Get update from Telegram
+        update_dict = request.get_json(force=True)
+        logger.info(f"Update received: {update_dict}")
+        
+        # Process update in Application
+        update = Update.de_json(update_dict, application.bot)
+        await application.process_update(update)
+        
+    return "OK"
+
+@app.route('/')
+def index():
+    """Simple home page to keep the service alive."""
+    return "Bot is running!"
+
+def setup_application():
+    """Set up the Application with all handlers."""
+    global application
+    
+    # Get token
     token = os.environ.get("TELEGRAM_TOKEN", "7932888925:AAFzrOM2MdGNkq8CsMmNx6kApMtFLN4M4sw")
     if not token:
         logger.error("Telegram token not found. Set the TELEGRAM_TOKEN environment variable.")
-        return
+        return None
     
-    # Build application without using default updater
-    application = Application.builder().token(token).updater(None).build()
+    # Build application
+    app_builder = Application.builder().token(token)
+    application = app_builder.build()
     
     # Add command handlers
     application.add_handler(CommandHandler("start", start))
@@ -251,27 +281,35 @@ def main() -> None:
     )
     application.add_handler(conv_handler)
     
-    # For Render - use webhook mode
+    return application
+
+async def setup_webhook():
+    """Set up webhook for the bot."""
+    webhook_url = os.environ.get("WEBHOOK_URL", os.environ.get("RENDER_EXTERNAL_URL"))
+    if not webhook_url:
+        logger.error("No webhook URL found. Set WEBHOOK_URL or use Render's RENDER_EXTERNAL_URL.")
+        return False
+    
+    logger.info(f"Setting webhook to {webhook_url}")
+    await application.bot.set_webhook(webhook_url)
+    return True
+
+def main():
+    """Start the bot."""
+    # Set up the Application
+    if not setup_application():
+        return
+    
+    # Setup webhook asynchronously
+    import asyncio
+    asyncio.run(setup_webhook())
+    
+    # Get port from environment
     port = int(os.environ.get("PORT", "8080"))
     
-    # Always use webhook mode on Render
-    webhook_url = os.environ.get("WEBHOOK_URL")
-    if not webhook_url:
-        webhook_url = os.environ.get("RENDER_EXTERNAL_URL")
-        if not webhook_url:
-            logger.error("No webhook URL found. Set WEBHOOK_URL or use Render's RENDER_EXTERNAL_URL.")
-            return
-    
-    logger.info(f"Starting webhook on port {port} with URL {webhook_url}")
-    
-    # Start webhook
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=port,
-        webhook_url=webhook_url,
-    )
-    
-    logger.info("Bot started")
+    # Start Flask server
+    logger.info(f"Starting Flask server on port {port}")
+    app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
     main() 
