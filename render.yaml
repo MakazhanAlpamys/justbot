@@ -14,4 +14,4 @@ services:
         # This will be automatically set by Render
         value: ${RENDER_EXTERNAL_URL}
       - key: PYTHON_VERSION
-        value: 3.13.4 
+        value: 3.11.0 
