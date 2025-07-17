@@ -1,7 +1,44 @@
 import json
 import logging
 import os
+import sys
 from typing import Dict, List
+
+# Fix for Python 3.13 missing imghdr module
+if sys.version_info >= (3, 13):
+    import builtins
+    import io
+    import struct
+    
+    # Create minimal imghdr substitute module
+    class ImghdrModule:
+        def what(file, h=None):
+            if h is None:
+                if isinstance(file, str):
+                    with open(file, 'rb') as f:
+                        h = f.read(32)
+                else:
+                    location = file.tell()
+                    h = file.read(32)
+                    file.seek(location)
+            
+            # Check for JPEG
+            if h[0:2] == b'\xff\xd8':
+                return 'jpeg'
+            # Check for PNG
+            if h[0:8] == b'\x89PNG\r\n\x1a\n':
+                return 'png'
+            # Check for GIF
+            if h[0:6] in (b'GIF87a', b'GIF89a'):
+                return 'gif'
+            # Check for WebP
+            if h[0:4] == b'RIFF' and h[8:12] == b'WEBP':
+                return 'webp'
+            # Unknown
+            return None
+    
+    # Add imghdr to builtins
+    sys.modules['imghdr'] = ImghdrModule()
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
